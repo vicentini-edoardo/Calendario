@@ -11,7 +11,8 @@ import os
 # Config comes from the KINDLE_CONFIG env var (GitHub secret) or a local config.json
 CFG = json.loads(os.environ["KINDLE_CONFIG"]) if os.environ.get("KINDLE_CONFIG") else json.loads((HERE / "config.json").read_text())
 TZ = ZoneInfo(CFG["timezone"])
-W, H = 600, 800
+TOP = 38   # blank strip reserved for the Kindle status bar (WiFi/battery), which the OS redraws on top
+W, H = 600, 800 - TOP
 FONT_CANDIDATES = [
     ("/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
     ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
@@ -231,18 +232,18 @@ def render(out_path):
         d.text((24+cw*i+cw/2, gy), g.upper(), font=font(13, True), fill=90, anchor="ma")
     gy += 19
     weeks = calendar.Calendar(0).monthdayscalendar(today.year, today.month)
-    rh = 31
+    rh = 25
     for wk in weeks:
         for i, dn in enumerate(wk):
             if not dn: continue
             cx = 24 + cw*i + cw/2; day = dt.date(today.year, today.month, dn)
             if day == today:
-                d.rounded_rectangle([cx-19, gy-2, cx+19, gy+rh-7], radius=7, fill=0)
+                d.rounded_rectangle([cx-18, gy-2, cx+18, gy+rh-4], radius=7, fill=0)
                 d.text((cx, gy), str(dn), font=font(20, True), fill=255, anchor="ma")
             else:
                 d.text((cx, gy), str(dn), font=font(20), fill=150 if day < today else 0, anchor="ma")
             if day in by_day:
-                d.ellipse([cx-3, gy+rh-12, cx+3, gy+rh-6], fill=255 if day == today else 0)
+                d.ellipse([cx-3, gy+rh-6, cx+3, gy+rh], fill=255 if day == today else 0)
         gy += rh
     d.line([24, gy+2, W-24, gy+2], fill=0, width=3)
 
@@ -266,7 +267,9 @@ def render(out_path):
         if shown == 0:
             d.text((24, ey), "Nessun evento in programma", font=font(18), fill=90)
     # Quantize to 16 greys, save
-    img = img.point(lambda p: (p // 16) * 17)
+    full = Image.new("L", (W, H + TOP), 255)
+    full.paste(img, (0, TOP))
+    img = full.point(lambda p: (p // 16) * 17)
     img.save(out_path, "PNG", optimize=True)
     print("saved", out_path, "| weather:", "ok" if wx else wx_err, "| events:", len(events) if not ev_err else ev_err)
 
