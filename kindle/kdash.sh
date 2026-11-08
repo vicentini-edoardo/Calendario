@@ -1,7 +1,12 @@
 #!/bin/sh
-# Kindle dashboard: refresh at 06:00, 12:00, 18:00, 24:00 Europe/Madrid (+5 min, so GitHub has rendered)
+# Kindle dashboard (screensaver mode).
+# The Kindle sleeps normally and wakes by itself every few minutes (powerd/phd RTC housekeeping wakes).
+# On every wake-up we check whether a new 6-hour slot (06/12/18/24 Europe/Madrid, +5 min) has started;
+# if so we download the new image, store it as the screensaver and draw it right away.
+# We never block sleep and never touch the WiFi (the OS reconnects it on resume).
 trap '' HUP
 D=/mnt/us/kdash
+SS=/mnt/us/linkss/screensavers/weather.png
 PID=/tmp/kdash.pid
 TZSPEC="CET-1CEST,M3.5.0,M10.5.0/3"
 OFFSET=300
@@ -10,43 +15,54 @@ echo $$ > $PID
 log() { echo "$(date '+%m-%d %H:%M:%S') $*" >> $D/log; }
 [ "$(wc -c < $D/log 2>/dev/null || echo 0)" -gt 50000 ] && : > $D/log
 
-secs_to_next() {
-  t=$(TZ=$TZSPEC date '+%H %M %S')
-  set -- $t
-  h=${1#0}; m=${2#0}; s=${3#0}
-  now=$(( ${h:-0}*3600 + ${m:-0}*60 + ${s:-0} ))
-  for slot in 0 21600 43200 64800 86400; do
-    tgt=$(( slot + OFFSET ))
-    [ $tgt -gt $now ] && { echo $(( tgt - now )); return; }
-  done
-  echo 21600
+# prints the id of the current slot, or nothing if we're inside the first OFFSET seconds of a slot
+slot_id() {
+  set -- $(TZ=$TZSPEC date '+%Y%m%d %H %M %S')
+  h=${2#0}; m=${3#0}; s=${4#0}
+  h=${h:-0}; m=${m:-0}; s=${s:-0}
+  into=$(( (h % 6)*3600 + m*60 + s ))
+  [ $into -lt $OFFSET ] && return
+  echo "$1-$(( h / 6 ))"
 }
 
-sleep ${KDASH_BOOT_WAIT:-45}   # let framework/wifi come up
-while true; do
-  URL=$(cat $D/url)
-  lipc-set-prop com.lab126.powerd preventScreenSaver 1 2>/dev/null
-  lipc-set-prop com.lab126.wifid enable 1 2>/dev/null
-  sleep 12   # wait for wifi association
-  ok=0; n=0
-  while [ $n -lt 6 ] && [ $ok -eq 0 ]; do
-    rm -f /tmp/kdash.png
-    if $D/curl -sS -m 60 --cacert $D/cacert.pem -o /tmp/kdash.png "$URL" && [ -s /tmp/kdash.png ]; then ok=1; else n=$((n+1)); sleep 15; fi
+do_update() {
+  # wait (max 60s) for the OS to reconnect WiFi after resume
+  n=0
+  while [ $n -lt 20 ]; do
+    [ "$(lipc-get-prop com.lab126.wifid cmState 2>/dev/null)" = "CONNECTED" ] && break
+    n=$((n+1)); sleep 3
+  done
+  URL=$(cat $D/url); ok=0; t=0
+  while [ $t -lt 3 ] && [ $ok -eq 0 ]; do
+    rm -f /tmp/kdash.png.new
+    if $D/curl -sS -m 40 --cacert $D/cacert.pem -o /tmp/kdash.png.new "$URL" && [ -s /tmp/kdash.png.new ]; then ok=1; else t=$((t+1)); sleep 5; fi
   done
   if [ $ok -eq 1 ]; then
-    /usr/sbin/eips -c; sleep 1
+    mv /tmp/kdash.png.new /tmp/kdash.png
+    cp /tmp/kdash.png $SS.new && mv $SS.new $SS
     /usr/sbin/eips -f -g /tmp/kdash.png
-    w=$(secs_to_next)
-    log "ok batt=$(lipc-get-prop com.lab126.powerd battLevel 2>/dev/null) next_in=${w}s"
+    return 0
+  fi
+  return 1
+}
+
+check() {
+  id=$(slot_id)
+  [ -z "$id" ] && return
+  [ "$id" = "$(cat $D/last_id 2>/dev/null)" ] && return
+  if do_update; then
+    echo "$id" > $D/last_id
+    log "updated slot=$id batt=$(lipc-get-prop com.lab126.powerd battLevel 2>/dev/null)"
   else
-    w=600
-    log "fetch failed, retry in 10 min"
+    log "fetch failed slot=$id (will retry on next wake)"
   fi
-  # Save battery: wifi off between updates (create /mnt/us/kdash/keepwifi to keep it on, e.g. for SSH)
-  if [ ! -e $D/keepwifi ]; then
-    sleep 3
-    lipc-set-prop com.lab126.wifid enable 0 2>/dev/null
-    log "wifi off"
-  fi
-  sleep $w
+}
+
+sleep ${KDASH_BOOT_WAIT:-45}
+check
+while true; do
+  # block until the next resume/screensaver exit; the timeout keeps us alive if the event never comes
+  lipc-wait-event -s 3600 com.lab126.powerd resuming,outOfScreenSaver >/dev/null 2>&1
+  sleep 15   # let the system settle (WiFi reconnect starts on resume)
+  check
 done
