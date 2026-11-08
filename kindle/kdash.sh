@@ -27,6 +27,7 @@ while true; do
   URL=$(cat $D/url)
   lipc-set-prop com.lab126.powerd preventScreenSaver 1 2>/dev/null
   lipc-set-prop com.lab126.wifid enable 1 2>/dev/null
+  sleep 12   # wait for wifi association
   ok=0; n=0
   while [ $n -lt 6 ] && [ $ok -eq 0 ]; do
     rm -f /tmp/kdash.png
@@ -40,6 +41,12 @@ while true; do
   else
     w=600
     log "fetch failed, retry in 10 min"
+  fi
+  # Save battery: wifi off between updates (create /mnt/us/kdash/keepwifi to keep it on, e.g. for SSH)
+  if [ ! -e $D/keepwifi ]; then
+    sleep 3
+    lipc-set-prop com.lab126.wifid enable 0 2>/dev/null
+    log "wifi off"
   fi
   sleep $w
 done
