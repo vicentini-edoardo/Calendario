@@ -11,7 +11,7 @@ import os
 # Config comes from the KINDLE_CONFIG env var (GitHub secret) or a local config.json
 CFG = json.loads(os.environ["KINDLE_CONFIG"]) if os.environ.get("KINDLE_CONFIG") else json.loads((HERE / "config.json").read_text())
 TZ = ZoneInfo(CFG["timezone"])
-TOP = 38   # blank strip reserved for the Kindle status bar (WiFi/battery), which the OS redraws on top
+TOP = 0   # no blank strip: in screensaver mode the Kindle status bar is not drawn
 W, H = 600, 800 - TOP
 FONT_CANDIDATES = [
     ("/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
