@@ -194,7 +194,7 @@ def render(out_path):
         bands = band_stats(wx, today)
         cols = [dict(bd, label=bd["name"], sub=f"{bd['a']}–{bd['b']}") for bd in bands]
         tom = dt.date.fromisoformat(dly["time"][1])
-        cols.insert(1, {"label": "Domani", "sub": GIORNI[tom.weekday()] + f" {tom.day}/{tom.month}", "a": -1, "b": -1, "tom": True,
+        cols.append({"label": "Domani", "sub": GIORNI[tom.weekday()] + f" {tom.day}/{tom.month}", "a": -1, "b": -1, "tom": True,
                         "tmin": dly["temperature_2m_min"][1], "tmax": dly["temperature_2m_max"][1],
                         "pp": dly["precipitation_probability_max"][1], "mm": dly["precipitation_sum"][1],
                         "code": dly["weather_code"][1]})
