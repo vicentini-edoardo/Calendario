@@ -192,19 +192,26 @@ def render(out_path):
         d.text((290, y+76), f"Pioggia oggi {dly['precipitation_probability_max'][0]}% · {dly['precipitation_sum'][0]:.1f} mm", font=font(18), fill=40)
         y += 112
         bands = band_stats(wx, today)
-        cw = (W-48)/4
+        cols = [dict(bd, label=bd["name"], sub=f"{bd['a']}–{bd['b']}") for bd in bands]
+        tom = dt.date.fromisoformat(dly["time"][1])
+        cols.insert(1, {"label": "Domani", "sub": GIORNI[tom.weekday()] + f" {tom.day}/{tom.month}", "a": -1, "b": -1, "tom": True,
+                        "tmin": dly["temperature_2m_min"][1], "tmax": dly["temperature_2m_max"][1],
+                        "pp": dly["precipitation_probability_max"][1], "mm": dly["precipitation_sum"][1],
+                        "code": dly["weather_code"][1]})
+        n = len(cols); cw = (W-48)/n
         d.line([24, y, W-24, y], fill=170, width=1)
-        for i, bd in enumerate(bands):
+        for i, bd in enumerate(cols):
             x0 = 24 + cw*i; cx = x0 + cw/2
-            if i: d.line([x0, y+6, x0, y+150], fill=200, width=1)
+            if i: d.line([x0, y+6, x0, y+156], fill=200, width=1)
             now_in = bd["a"] <= now.hour < bd["b"]
-            if now_in:
-                d.rounded_rectangle([x0+8, y+6, x0+cw-8, y+32], radius=6, fill=0)
-            d.text((cx, y+8), bd["name"], font=font(17, True), fill=255 if now_in else 0, anchor="ma")
-            icon(d, wmo(bd["code"])[1], cx, y+68, 24)
-            d.text((cx, y+100), f"{round(bd['tmin'])}° / {round(bd['tmax'])}°", font=font(19, True), fill=0, anchor="ma")
-            d.text((cx, y+124), f"{bd['pp']}%  ·  {bd['mm']:.1f} mm", font=font(16), fill=40, anchor="ma")
-        y += 156
+            if now_in or bd.get("tom"):
+                d.rounded_rectangle([x0+5, y+6, x0+cw-5, y+30], radius=6, fill=0 if now_in else 255, outline=0, width=2)
+            d.text((cx, y+9), bd["label"], font=font(15, True), fill=255 if now_in else 0, anchor="ma")
+            d.text((cx, y+34), bd["sub"], font=font(14), fill=70, anchor="ma")
+            icon(d, wmo(bd["code"])[1], cx, y+82, 22)
+            d.text((cx, y+110), f"{round(bd['tmin'])}°/{round(bd['tmax'])}°", font=font(18, True), fill=0, anchor="ma")
+            d.text((cx, y+133), f"{bd['pp']}% · {bd['mm']:.1f}mm", font=font(14), fill=40, anchor="ma")
+        y += 162
     else:
         d.text((24, y+10), "Meteo non disponibile", font=font(24, True), fill=0)
         d.text((24, y+44), (wx_err or "")[:70], font=font(14), fill=90)
