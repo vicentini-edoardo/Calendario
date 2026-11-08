@@ -1,0 +1,4 @@
+pillow
+icalendar
+recurring-ical-events
+requests

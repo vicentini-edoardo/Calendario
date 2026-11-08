@@ -1,0 +1,18 @@
+{
+  "city": "Donostia",
+  "lat": 43.3183,
+  "lon": -1.9812,
+  "timezone": "Europe/Madrid",
+  "calendars": [
+    {
+      "name": "Miguel",
+      "url": "https://calendar.google.com/calendar/ical/XXXX/private-XXXX/basic.ics",
+      "priority": false
+    },
+    {
+      "name": "Pranzo",
+      "url": "https://calendar.google.com/calendar/ical/XXXX/private-XXXX/basic.ics",
+      "priority": true
+    }
+  ]
+}

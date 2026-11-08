@@ -1,0 +1,6 @@
+config.json
+.venv/
+keys/
+site/
+*.png
+!placeholder.png
