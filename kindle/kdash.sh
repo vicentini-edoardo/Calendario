@@ -85,6 +85,8 @@ next_wait() {
 sleep ${KDASH_BOOT_WAIT:-45}
 while true; do
   lipc-set-prop com.lab126.powerd preventScreenSaver 1 2>/dev/null
+  # stop the Kindle UI: its status bar would otherwise be repainted over the top of the image
+  /etc/init.d/framework stop >/dev/null 2>&1
   lipc-set-prop com.lab126.wifid enable 1 2>/dev/null
   check
   # (re)draw the current image: after a resume the framework may have repainted the screen
