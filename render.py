@@ -271,6 +271,8 @@ def render(out_path):
     full.paste(img, (0, TOP))
     img = full.point(lambda p: (p // 16) * 17)
     img.save(out_path, "PNG", optimize=True)
+    # marker with the 6h slot this image belongs to (the Kindle checks it to detect a stale image)
+    open(str(out_path) + ".slot", "w").write(f"{now:%Y%m%d}-{now.hour // 6}")
     print("saved", out_path, "| weather:", "ok" if wx else wx_err, "| events:", len(events) if not ev_err else ev_err)
 
 if __name__ == "__main__":

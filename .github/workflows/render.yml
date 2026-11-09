@@ -2,6 +2,9 @@ name: Render Kindle screen
 on:
   schedule:
     - cron: "*/30 * * * *"
+    # extra attempts right after each slot boundary (06/12/18/24 Madrid = 04/05, 10/11, 16/17, 22/23 UTC):
+    # GitHub often drops or delays scheduled runs, so several chances are needed
+    - cron: "3,13,23,33,43,53 4,5,10,11,16,17,22,23 * * *"
   workflow_dispatch:
 permissions:
   contents: read

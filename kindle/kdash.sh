@@ -12,7 +12,7 @@ PID=/tmp/kdash.pid
 TZSPEC="CET-1CEST,M3.5.0,M10.5.0/3"
 OFFSET=300
 AWAKE=60
-RETRY=600
+RETRY=900
 RTC=/sys/class/rtc/rtc1/wakealarm
 [ -f $PID ] && kill -0 "$(cat $PID)" 2>/dev/null && exit 0
 echo $$ > $PID
@@ -47,8 +47,12 @@ wifi_wait() {
 do_update() {
   wifi_wait
   URL=$(cat $D/url); ok=0; t=0
+  # the image must have been rendered for the current slot (marker file next to the PNG), else it is stale
+  want=$(slot_id)
   while [ $t -lt 3 ] && [ $ok -eq 0 ]; do
     rm -f /tmp/kdash.png.new
+    got=$($D/curl -sS -m 30 --cacert $D/cacert.pem "$URL.slot" 2>/dev/null)
+    if [ "$got" != "$want" ]; then log "stale image (have=$got want=$want)"; return 1; fi
     if $D/curl -sS -m 40 --cacert $D/cacert.pem -o /tmp/kdash.png.new "$URL" && [ -s /tmp/kdash.png.new ]; then ok=1; else t=$((t+1)); sleep 5; fi
   done
   if [ $ok -eq 1 ]; then
