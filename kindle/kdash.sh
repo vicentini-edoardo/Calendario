@@ -13,6 +13,7 @@ TZSPEC="CET-1CEST,M3.5.0,M10.5.0/3"
 OFFSET=300
 AWAKE=60
 RETRY=900
+STALE_MAX=3
 RTC=/sys/class/rtc/rtc1/wakealarm
 [ -f $PID ] && kill -0 "$(cat $PID)" 2>/dev/null && exit 0
 echo $$ > $PID
@@ -46,18 +47,29 @@ wifi_wait() {
 
 do_update() {
   wifi_wait
-  URL=$(cat $D/url); ok=0; t=0
+  URL=$(cat $D/url); ok=0; t=0; accept=0
   # the image must have been rendered for the current slot (marker file next to the PNG), else it is stale
   want=$(slot_id)
   while [ $t -lt 3 ] && [ $ok -eq 0 ]; do
     rm -f /tmp/kdash.png.new
     got=$($D/curl -sS -m 30 --cacert $D/cacert.pem "$URL.slot" 2>/dev/null)
-    if [ "$got" != "$want" ]; then log "stale image (have=$got want=$want)"; return 1; fi
+    if [ "$got" != "$want" ]; then
+      # GitHub cron can be late/dropped: after STALE_MAX stale attempts for this slot, accept the newest image anyway
+      n=0; [ "$(cut -d: -f1 $D/stale 2>/dev/null)" = "$want" ] && n=$(cut -d: -f2 $D/stale)
+      n=$((n+1)); echo "$want:$n" > $D/stale
+      log "stale image (have=$got want=$want try=$n)"
+      [ -z "$got" ] && return 1
+      [ $n -lt $STALE_MAX ] && return 1
+      [ "$got" = "$(cat $D/last_id 2>/dev/null)" ] && return 1
+      accept=1
+    fi
     if $D/curl -sS -m 40 --cacert $D/cacert.pem -o /tmp/kdash.png.new "$URL" && [ -s /tmp/kdash.png.new ]; then ok=1; else t=$((t+1)); sleep 5; fi
   done
   if [ $ok -eq 1 ]; then
     mv /tmp/kdash.png.new /tmp/kdash.png
     cp /tmp/kdash.png $SS.new && mv $SS.new $SS
+    # stale image accepted as fallback: remember its slot so it is not re-downloaded, but keep retrying for the fresh one
+    if [ $accept -eq 1 ]; then echo "$got" > $D/last_id; log "accepted stale image slot=$got (want=$want)"; return 1; fi
     return 0
   fi
   return 1
